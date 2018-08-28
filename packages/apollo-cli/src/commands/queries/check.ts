@@ -1,46 +1,45 @@
-import "apollo-codegen-core/lib/polyfills";
-import { Command, flags } from "@oclif/command";
-import { table, styledJSON } from "heroku-cli-util";
-import * as Listr from "listr";
-import { toPromise, execute } from "apollo-link";
-import { print, GraphQLError } from "graphql";
+import 'apollo-codegen-core/lib/polyfills';
+import { Command, flags } from '@oclif/command';
+import { table, styledJSON } from 'heroku-cli-util';
+import * as Listr from 'listr';
+import { toPromise, execute } from 'apollo-link';
+import { print, GraphQLError } from 'graphql';
 
-import { loadQueryDocuments } from "apollo-codegen-core/lib/loading";
+import { loadQueryDocuments } from 'apollo-codegen-core/lib/loading';
 
-import { engineFlags } from "../../engine-cli";
-import { engineLink, getIdFromKey } from "../../engine";
-import { gitInfo } from "../../git";
-import { VALIDATE_OPERATIONS } from "../../operations/validateOperations";
-import { ChangeType } from "../../printer/ast";
-import { format } from "../schema/check";
-import { resolveDocumentSets } from "../../config";
-import { loadConfigStep } from "../../load-config";
+import { engineFlags } from '../../engine-cli';
+import { engineLink, getIdFromKey } from '../../engine';
+import { gitInfo } from '../../git';
+import { VALIDATE_OPERATIONS } from '../../operations/validateOperations';
+import { ChangeType } from '../../printer/ast';
+import { format } from '../schema/check';
+import { resolveDocumentSets } from '../../config';
+import { loadConfigStep } from '../../load-config';
 
 export default class CheckQueries extends Command {
   static description =
-    "Checks your GraphQL operations for compatibility with the server. Checks against the published schema in Apollo Engine.";
+    'Checks your GraphQL operations for compatibility with the server. Checks against the published schema in Apollo Engine.';
 
   static flags = {
     help: flags.help({
-      char: "h",
-      description: "Show command help"
+      char: 'h',
+      description: 'Show command help'
     }),
     config: flags.string({
-      description: "Path to your Apollo config file"
+      description: 'Path to your Apollo config file'
     }),
     queries: flags.string({
-      description:
-        "Path to your GraphQL queries, can include search tokens like **"
+      description: 'Path to your GraphQL queries, can include search tokens like **'
     }),
     json: flags.boolean({
-      description: "Output result as JSON"
+      description: 'Output result as JSON'
     }),
     ...engineFlags,
 
     tagName: flags.string({
       description:
-        "Name of the template literal tag used to identify template literals containing GraphQL queries in Javascript/Typescript code",
-      default: "gql"
+        'Name of the template literal tag used to identify template literals containing GraphQL queries in Javascript/Typescript code',
+      default: 'gql'
     })
   };
 
@@ -50,26 +49,21 @@ export default class CheckQueries extends Command {
     const tasks: Listr = new Listr([
       loadConfigStep(flags, false),
       {
-        title: "Resolving GraphQL document sets",
+        title: 'Resolving GraphQL document sets',
         task: async (ctx, task) => {
           ctx.documentSets = await resolveDocumentSets(ctx.config, false);
-          const operations = loadQueryDocuments(
-            ctx.documentSets[0].documentPaths,
-            flags.tagName
-          );
-          task.title = `Scanning for GraphQL queries (${
-            operations.length
-          } found)`;
+          const operations = loadQueryDocuments(ctx.documentSets[0].documentPaths, flags.tagName);
+          task.title = `Scanning for GraphQL queries (${operations.length} found)`;
           // XXX send along file information as well
           ctx.operations = operations.map(doc => ({ document: print(doc) }));
         }
       },
       {
-        title: "Checking query compatibility with schema",
+        title: 'Checking query compatibility with schema',
         task: async ctx => {
           if (!ctx.documentSets[0].engineKey) {
             this.error(
-              "No API key was specified. Set an Apollo Engine API key using the `--key` flag or the `ENGINE_API_KEY` environment variable."
+              'No API key was specified. Set an Apollo Engine API key using the `--key` flag or the `ENGINE_API_KEY` environment variable.'
             );
           }
 
@@ -78,7 +72,7 @@ export default class CheckQueries extends Command {
           const variables = {
             id: getIdFromKey(ctx.documentSets[0].engineKey),
             // XXX hardcoded for now
-            tag: "current",
+            tag: 'current',
             gitContext,
             operations: ctx.operations
           };
@@ -88,7 +82,7 @@ export default class CheckQueries extends Command {
               query: VALIDATE_OPERATIONS,
               variables,
               context: {
-                headers: { ["x-api-key"]: ctx.documentSets[0].engineKey },
+                headers: { ['x-api-key']: ctx.documentSets[0].engineKey },
                 ...(ctx.config.engineEndpoint && {
                   uri: ctx.config.engineEndpoint
                 })
@@ -97,21 +91,13 @@ export default class CheckQueries extends Command {
           )
             .then(({ data, errors }) => {
               // XXX better end user error message
-              if (errors)
-                throw new Error(
-                  errors.map(({ message }) => message).join("\n")
-                );
-              if (!data!.service)
-                throw new Error(`No schema found for ${variables.id}`);
+              if (errors) throw new Error(errors.map(({ message }) => message).join('\n'));
+              if (!data!.service) throw new Error(`No schema found for ${variables.id}`);
               return data!.service.schema.checkOperations;
             })
             .catch(e => {
               if (e.result && e.result.errors) {
-                this.error(
-                  e.result.errors
-                    .map(({ message }: GraphQLError) => message)
-                    .join("\n")
-                );
+                this.error(e.result.errors.map(({ message }: GraphQLError) => message).join('\n'));
               } else {
                 this.error(e.message);
               }
@@ -121,9 +107,7 @@ export default class CheckQueries extends Command {
     ]);
 
     return tasks.run().then(async ({ changes }) => {
-      const failures = changes.filter(
-        ({ type }: { type: ChangeType }) => type === ChangeType.FAILURE
-      );
+      const failures = changes.filter(({ type }: { type: ChangeType }) => type === ChangeType.FAILURE);
       const exit = failures.length > 0 ? 1 : 0;
       if (flags.json) {
         await styledJSON({ changes });
@@ -131,19 +115,17 @@ export default class CheckQueries extends Command {
         this.exit(exit);
       }
       if (changes.length === 0) {
-        return this.log(
-          "\nNo operations have issues with the current schema\n"
-        );
+        return this.log('\nNo operations have issues with the current schema\n');
       }
-      this.log("\n");
+      this.log('\n');
       table(changes.map(format), {
         columns: [
-          { key: "type", label: "Change" },
-          { key: "code", label: "Code" },
-          { key: "description", label: "Description" }
+          { key: 'type', label: 'Change' },
+          { key: 'code', label: 'Code' },
+          { key: 'description', label: 'Description' }
         ]
       });
-      this.log("\n");
+      this.log('\n');
       // exit with failing status if we have failures
       this.exit(exit);
     });
