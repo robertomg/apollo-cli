@@ -2,7 +2,7 @@ import { Command, flags } from '@oclif/command';
 import * as Listr from 'listr';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
-import { DocumentNode, print, visit, Kind, OperationDefinitionNode, FragmentDefinitionNode } from 'graphql';
+import { DocumentNode, visit, Kind, OperationDefinitionNode, FragmentDefinitionNode } from 'graphql';
 import { hideLiterals, printWithReducedWhitespace, sortAST } from 'apollo-engine-reporting';
 
 import { loadQueryDocuments } from 'apollo-codegen-core/lib/loading';
@@ -44,7 +44,7 @@ export default class ExtractQueries extends Command {
       loadConfigStep(flags, false),
       {
         title: 'Resolving GraphQL document sets',
-        task: async (ctx, task) => {
+        task: async ctx => {
           ctx.documentSets = await resolveDocumentSets(ctx.config, false);
         }
       },
@@ -67,7 +67,7 @@ export default class ExtractQueries extends Command {
       },
       {
         title: 'Isolating operations and fragments',
-        task: async (ctx, task) => {
+        task: async ctx => {
           ctx.fragments = {};
           ctx.operations = [] as Array<DocumentNode>;
 
@@ -100,7 +100,7 @@ export default class ExtractQueries extends Command {
       },
       {
         title: 'Combining operations and fragments',
-        task: async (ctx, task) => {
+        task: async ctx => {
           ctx.fullOperations = [];
           (ctx.operations as Array<OperationDefinitionNode>).forEach(operation => {
             const completeOperation: Array<OperationDefinitionNode | FragmentDefinitionNode> = [operation];
